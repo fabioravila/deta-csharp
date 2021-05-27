@@ -16,6 +16,12 @@ namespace DetaCSharp.Utils
         readonly HttpClient http;
         const string JsonContentType = "application/json";
 
+
+        static JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
         public RequestsHelper(string projectKey, string baseUrl, HttpClient http = null)
         {
             var projectId = projectKey.Split("_")[0];
@@ -26,11 +32,13 @@ namespace DetaCSharp.Utils
 
 
         public Task<Response<Unit>> Put(string uri, object payload) => SendAsync(HttpMethod.Put, uri, payload);
-        public Task<Response<Unit>> Delete(string uri, object payload = null) => SendAsync(HttpMethod.Delete, uri, payload);
+        public Task<Response<T>> Delete<T>(string uri, object payload = null) => SendAsync<T>(HttpMethod.Delete, uri, payload);
         public Task<Response<T>> Get<T>(string uri) => SendAsync<T>(HttpMethod.Get, uri, null);
         public Task<Response<Unit>> Post(string uri, object payload) => SendAsync(HttpMethod.Post, uri, payload);
         public Task<Response<T>> Post<T>(string uri, RequestInit init) => SendAsync<T>(HttpMethod.Post, uri, init.Payload, init.Headers);
         public Task<Response<Unit>> Patch(string uri, object payload = null) => SendAsync(HttpMethod.Patch, uri, payload);
+
+        public Task<Response<T>> Patch<T>(string uri, object payload = null) => SendAsync<T>(HttpMethod.Patch, uri, payload);
 
 
         Task<Response<Unit>> SendAsync(HttpMethod method, string path, object payload, IEnumerable<KeyValuePair<string, string>> aditionalHeaders = null)
@@ -120,7 +128,7 @@ namespace DetaCSharp.Utils
             }
             else
             {
-                return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, JsonContentType);
+                return new StringContent(JsonSerializer.Serialize(payload, JsonSerializerOptions), Encoding.UTF8, JsonContentType);
             }
 
         }
@@ -132,7 +140,7 @@ namespace DetaCSharp.Utils
                 return default;
             }
 
-            return await JsonSerializer.DeserializeAsync<T>(stream);
+            return await JsonSerializer.DeserializeAsync<T>(stream, JsonSerializerOptions);
         }
 
 

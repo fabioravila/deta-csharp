@@ -31,6 +31,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="files\11MB_file.xpto">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="files\deta_logo.svg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

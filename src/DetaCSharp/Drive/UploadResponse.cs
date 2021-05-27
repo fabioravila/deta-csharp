@@ -1,15 +1,21 @@
-﻿using DetaCSharp.Types;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text.Json.Serialization;
 
 namespace DetaCSharp.Drive
 {
     public class UploadResponse
     {
-        public object Response { get; set; }
-        public DetaException Error { get; set; }
+        [JsonPropertyName("upload_id")]
+        public string UploadId { get; set; }
+
+        public string Name { get; set; }
+
+        public int? Part { get; set; }
+
+        [JsonPropertyName("project_id")]
+        public string ProjectId { get; set; }
+
+        [JsonPropertyName("drive_name")]
+        public string DriveName { get; set; }
+
     }
 }
