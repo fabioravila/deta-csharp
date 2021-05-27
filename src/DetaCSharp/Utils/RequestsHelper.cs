@@ -25,16 +25,20 @@ namespace DetaCSharp.Utils
         }
 
 
-        public Task<Response> Put(string uri, object payload) => SendAsync(HttpMethod.Put, uri, payload);
-        public Task<Response> Delete(string uri, object payload = null) => SendAsync(HttpMethod.Delete, uri, payload);
-        public Task<Response> Get(string uri) => SendAsync(HttpMethod.Get, uri, null);
-        public Task<Response> Post(string uri, object payload) => SendAsync(HttpMethod.Post, uri, payload);
-        public Task<Response> Post(string uri, RequestInit init) => SendAsync(HttpMethod.Post, uri, init.Payload, init.Headers);
-        public Task<Response> Patch(string uri, object payload = null) => SendAsync(HttpMethod.Patch, uri, payload);
+        public Task<Response<Unit>> Put(string uri, object payload) => SendAsync(HttpMethod.Put, uri, payload);
+        public Task<Response<Unit>> Delete(string uri, object payload = null) => SendAsync(HttpMethod.Delete, uri, payload);
+        public Task<Response<T>> Get<T>(string uri) => SendAsync<T>(HttpMethod.Get, uri, null);
+        public Task<Response<Unit>> Post(string uri, object payload) => SendAsync(HttpMethod.Post, uri, payload);
+        public Task<Response<T>> Post<T>(string uri, RequestInit init) => SendAsync<T>(HttpMethod.Post, uri, init.Payload, init.Headers);
+        public Task<Response<Unit>> Patch(string uri, object payload = null) => SendAsync(HttpMethod.Patch, uri, payload);
 
-        private async Task<Response> SendAsync(HttpMethod method, string path, object payload, IEnumerable<KeyValuePair<string, string>> aditionalHeaders = null)
+
+        Task<Response<Unit>> SendAsync(HttpMethod method, string path, object payload, IEnumerable<KeyValuePair<string, string>> aditionalHeaders = null)
+            => SendAsync<Unit>(method, path, payload, aditionalHeaders);
+
+        async Task<Response<T>> SendAsync<T>(HttpMethod method, string path, object payload, IEnumerable<KeyValuePair<string, string>> aditionalHeaders = null)
         {
-            using var request = new HttpRequestMessage(method, new Uri($"{baseUrl}${path}"));
+            using var request = new HttpRequestMessage(method, new Uri($"{baseUrl}{path}"));
 
             request.Headers.TryAddWithoutValidation("X-API-Key", projectKey);
             if (aditionalHeaders != null)
@@ -66,7 +70,7 @@ namespace DetaCSharp.Utils
 
                 var message = error?.Errors?.Length > 0 ? error.Errors[0] : "Something went wrong";
 
-                return new Response
+                return new Response<T>
                 {
                     Error = new DetaException(response.StatusCode, message),
                     Status = response.StatusCode
@@ -74,19 +78,21 @@ namespace DetaCSharp.Utils
             }
 
 
-            if (response.Content.Headers.ContentType.MediaType.StartsWith(JsonContentType))
+            if (response.Content.Headers.ContentType != null && response.Content.Headers.ContentType.MediaType != null &&
+                response.Content.Headers.ContentType.MediaType.StartsWith(JsonContentType))
             {
-                return new Response
+                return new Response<T>
                 {
-                    Body = DeserializeJsonFromStream<object>(streamResponse),
+                    Body = await DeserializeJsonFromStream<T>(streamResponse),
                     Status = response.StatusCode
                 };
             }
             else
             {
-                return new Response
+                return new Response<T>
                 {
-                    Body = streamResponse,
+                    Body = default,
+                    BodyStream = streamResponse,
                     Status = response.StatusCode
                 };
             }

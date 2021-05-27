@@ -24,7 +24,6 @@ namespace DetaCSharp.Drive
             requestHelper = new RequestsHelper(options.ProjectKey, diveHostUrl, httpClient);
         }
 
-
         public async Task<Stream> Get(string name)
         {
             var trimmedName = name?.Trim();
@@ -36,22 +35,18 @@ namespace DetaCSharp.Drive
 
             var encodedName = HttpUtility.UrlEncode(trimmedName);
 
-            var response = await requestHelper.Get(DriveApi.GET_FILE.Replace(":name", encodedName));
+            var response = await requestHelper.Get<Unit>(DriveApi.GET_FILE.Replace(":name", encodedName));
 
             if (response.IsError && response.Status == System.Net.HttpStatusCode.NotFound)
             {
                 return null;
             }
 
-            if (response.IsError)
-            {
-                throw response.Error;
-            }
+            response.EnsureSuccess();
 
 
-            return response.Body as Stream;
+            return response.BodyStream;
         }
-
 
         public async Task Delete(string name)
         {
@@ -68,10 +63,7 @@ namespace DetaCSharp.Drive
             });
 
 
-            if (response.IsError)
-            {
-                throw response.Error;
-            }
+            response.EnsureSuccess();
 
             //TODO : Adjus helper fo serialize correct response
 
@@ -102,35 +94,25 @@ namespace DetaCSharp.Drive
                 throw new DetaException(response.Status, "Names can't be empty");
             }
 
-            if (response.IsError)
-            {
-                throw response.Error;
-            }
+            response.EnsureSuccess();
 
             //TODO : Adjust Helper for serialize correct response
 
         }
 
-
-        public async Task<ListResponse> List(ListOptions options)
+        public async Task<ListResponse> List(ListOptions options = null)
         {
-            var opt = options ?? new ListOptions();
+            var opt = options ?? ListOptions.Empty;
 
-            var response = await requestHelper.Get(DriveApi.LIST_FILES.Replace(":prefix", opt.Prefix ?? "")
-                                                                      .Replace(":limit", (opt.Limit ?? 1000).ToString())
-                                                                      .Replace(":last", opt.Last ?? ""));
+            var response = await requestHelper.Get<ListResponse>(DriveApi.LIST_FILES.Replace(":prefix", opt.Prefix ?? "")
+                                                                                    .Replace(":limit", (opt.Limit ?? 1000).ToString())
+                                                                                    .Replace(":last", opt.Last ?? ""));
 
-
-            if (response.IsError)
-            {
-                throw response.Error;
-            }
+            response.EnsureSuccess();
 
 
-            return response.Body as ListResponse;
+            return response.Body;
         }
-
-
 
         public async Task<string> Put(string name, PutOptions options)
         {
@@ -142,7 +124,6 @@ namespace DetaCSharp.Drive
 
             var encodedName = HttpUtility.UrlEncode(trimmedName);
 
-
             if (!string.IsNullOrWhiteSpace(options.Path) && options.Data != null)
             {
                 throw new ArgumentException("Please only provide data or a path. Not both");
@@ -153,27 +134,55 @@ namespace DetaCSharp.Drive
                 throw new ArgumentException("Please provide data or a path. Both are empty");
             }
 
+            var streamData = ExtractStreamData(options, out bool ownStream);
 
-            object data = null;
+            try
+            {
+                var response = await Upload(encodedName, streamData, options.ContentType ?? "binary/octet-stream");
+
+                if (response.Error != null)
+                {
+                    throw response.Error;
+                }
+
+                return response.Response as string;
+            }
+            finally
+            {
+                if (ownStream && streamData != null)
+                {
+                    streamData.Close();
+                    streamData.Dispose();
+                }
+            }
+        }
+
+        static Stream ExtractStreamData(PutOptions options, out bool ownStream)
+        {
+            Stream streamData = null;
+            ownStream = false;
+
             if (!string.IsNullOrWhiteSpace(options.Path))
             {
-                data = new FileStream(options.Path, FileMode.Open, FileAccess.Read);
+                streamData = new FileStream(options.Path, FileMode.Open, FileAccess.Read);
+                ownStream = true;
             }
-
 
             if (options.Data != null)
             {
                 if (options.Data is Stream)
                 {
-                    data = options.Data as Stream;
+                    streamData = options.Data as Stream;
                 }
                 else if (options.Data is string)
                 {
-                    data = Encoding.UTF8.GetBytes(options.Data as string);
+                    streamData = new MemoryStream(Encoding.UTF8.GetBytes(options.Data as string));
+                    ownStream = true;
                 }
                 else if (options.Data is byte[])
                 {
-                    data = options.Data as byte[];
+                    streamData = new MemoryStream(options.Data as byte[]);
+                    ownStream = true;
                 }
                 else
                 {
@@ -181,27 +190,13 @@ namespace DetaCSharp.Drive
                 }
             }
 
-            if (data is null)
-            {
-                throw new ArgumentException("Data can´t be null");
-            }
-
-            //PS: Only pass Stream or byte[]
-            var response = await Upload(encodedName, data, options.ContentType ?? "binary/octet-stream");
-
-
-            if (response.Error != null)
-            {
-                throw response.Error;
-            }
-
-
-            return response.Response as string;
+            return streamData;
         }
 
-        async Task<UploadResponse> Upload(string name, object data, string contentType)
+        async Task<UploadResponse> Upload(string name, Stream streamData, string contentType)
         {
             //TODO: Create a algo to read the stream in chunks, so no ned to put a memorystream here
+            //NOTE: Putt all code in one method to avoid context in action
             var chunkSize = 1024 * 1024 * 10; //10MB
 
             var requestInit = new RequestInit
@@ -213,93 +208,61 @@ namespace DetaCSharp.Drive
             };
 
             //INT_FILE
-            var response = await requestHelper.Post(DriveApi.INIT_CHUNK_UPLOAD.Replace(":name", name), requestInit);
-            if (response.IsError)
-            {
-                throw response.Error;
-            }
+            var response = await requestHelper.Post<UploadApiResponse>(DriveApi.INIT_CHUNK_UPLOAD.Replace(":name", name), requestInit);
+            response.EnsureSuccess();
 
-
-            var uploadId = "upload id get from typed reponse";
+            var uploadId = response.Body.UploadId;
 
 
             //CHUNK_FILE
-            Stream streamData = null;
-            var ownStream = false;
-            try
+            var part = 1;
+            var buffer = new byte[chunkSize];
+            int read;
+            do
             {
-
-                if (data is Stream)
+                read = streamData.Read(buffer, 0, buffer.Length);
+                if (read > 0)
                 {
-                    streamData = data as Stream;
-                }
-                else
-                {
-                    streamData = new MemoryStream(data as byte[]);
-                    ownStream = true;
-                }
-
-                var part = 1;
-                var buffer = new byte[chunkSize];
-                int read;
-                do
-                {
-                    read = streamData.Read(buffer, 0, buffer.Length);
-                    if (read > 0)
+                    //Need check read < buffer.Lenght?
+                    if (read < buffer.Length)
                     {
-                        //Need check read < buffer.Lenght?
-                        if (read < buffer.Length)
-                        {
-                            var last = new byte[read];
-                            Array.Copy(buffer, last, last.Length);
-                            buffer = last;
-                        }
-
-                        requestInit.Payload = buffer;
-
-                        response = await requestHelper.Post(DriveApi.UPLOAD_FILE_CHUNK.Replace(":uid", uploadId)
-                                                                                      .Replace(":name", name)
-                                                                                      .Replace(":part", part.ToString()), requestInit);
-
-                        if (response.IsError)
-                        {
-                            return new UploadResponse { Error = response.Error };
-                        }
-
-
-                        part++;
+                        var last = new byte[read];
+                        Array.Copy(buffer, last, last.Length);
+                        buffer = last;
                     }
-                } while (read > 0);
+
+                    requestInit.Payload = buffer;
+
+                    response = await requestHelper.Post<UploadApiResponse>(DriveApi.UPLOAD_FILE_CHUNK.Replace(":uid", uploadId)
+                                                                                  .Replace(":name", name)
+                                                                                  .Replace(":part", part.ToString()), requestInit);
+
+                    if (response.IsError)
+                    {
+                        return new UploadResponse { Error = response.Error };
+                    }
 
 
-
-                //COMPLETE_FILE
-                response = await requestHelper.Patch(DriveApi.COMPLETE_FILE_UPLOAD.Replace(":uid", uploadId)
-                                                                                  .Replace(":name", name));
-
-
-
-                if (response.IsError)
-                {
-                    return new UploadResponse { Error = response.Error };
+                    part++;
                 }
+            } while (read > 0);
 
 
 
+            //COMPLETE_FILE
+            var complete = await requestHelper.Patch(DriveApi.COMPLETE_FILE_UPLOAD.Replace(":uid", uploadId)
+                                                                              .Replace(":name", name));
 
-                return new UploadResponse
-                {
-                    Response = name
-                };
-            }
-            finally
+            if (complete.IsError)
             {
-                if (ownStream && streamData != null)
-                {
-                    streamData.Close();
-                    streamData.Dispose();
-                }
+                return new UploadResponse { Error = complete.Error };
             }
+
+
+            return new UploadResponse
+            {
+                Response = name
+            };
         }
     }
 }

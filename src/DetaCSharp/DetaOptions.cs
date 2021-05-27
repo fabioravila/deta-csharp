@@ -9,11 +9,11 @@
         public string DriveHostUrl { get; private set; }
         public string BaseHostUrl { get; private set; }
 
-        public static DetaOptions Default(string porjectKey) => new DetaOptions
+        public static DetaOptions Default(string projectKey) => new DetaOptions
         {
-            ProjectKey = porjectKey,
-            DriveHostUrl = BASE_HOST_URL,
-            BaseHostUrl = DRIVE_HOST_URL
+            ProjectKey = projectKey,
+            DriveHostUrl = DRIVE_HOST_URL,
+            BaseHostUrl = BASE_HOST_URL
         };
     }
 }

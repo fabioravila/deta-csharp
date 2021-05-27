@@ -10,11 +10,6 @@ namespace DetaCSharp
         private readonly DetaOptions options;
         private readonly HttpClient http;
 
-        public Deta(HttpClient http)
-        {
-            this.http = http;
-        }
-
         public Deta(string projectKey, HttpClient httpClient = null)
         {
             options = DetaOptions.Default(projectKey);

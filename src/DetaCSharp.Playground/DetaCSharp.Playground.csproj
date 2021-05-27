@@ -6,7 +6,34 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="files\deta_img.svg" />
+    <None Remove="files\text_file.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="files\text_file.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+
+  <ItemGroup>
     <ProjectReference Include="..\DetaCSharp\DetaCSharp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="files\deta_img.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="files\text_file.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="files\deta_logo.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
