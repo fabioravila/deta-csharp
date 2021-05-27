@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31313.79
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DetaCSharp", "src\DetaCSharp\DetaCSharp.csproj", "{D8CC1AB4-724C-4AF2-BFC8-F0D8E7AE6F98}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DetaCSharp.Playground", "DetaCSharp.Playground\DetaCSharp.Playground.csproj", "{AC9C0ECE-4169-4775-BA1C-A21B9E102275}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D8CC1AB4-724C-4AF2-BFC8-F0D8E7AE6F98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8CC1AB4-724C-4AF2-BFC8-F0D8E7AE6F98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8CC1AB4-724C-4AF2-BFC8-F0D8E7AE6F98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8CC1AB4-724C-4AF2-BFC8-F0D8E7AE6F98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC9C0ECE-4169-4775-BA1C-A21B9E102275}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC9C0ECE-4169-4775-BA1C-A21B9E102275}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC9C0ECE-4169-4775-BA1C-A21B9E102275}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC9C0ECE-4169-4775-BA1C-A21B9E102275}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3CF6C3D4-9D67-4627-8689-0E74940FEF32}
+	EndGlobalSection
+EndGlobal
