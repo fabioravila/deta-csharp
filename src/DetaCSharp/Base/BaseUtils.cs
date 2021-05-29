@@ -10,6 +10,5 @@ namespace DetaCSharp.Base
         public static DetaAction Append(object[] value) => new DetaAction(ActionTypes.Append, value);
         public static DetaAction Prepend(object value) => new DetaAction(ActionTypes.Prepend, new[] { value });
         public static DetaAction Prepend(object[] value) => new DetaAction(ActionTypes.Prepend, value);
-
     }
 }

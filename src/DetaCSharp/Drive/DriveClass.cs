@@ -220,19 +220,18 @@ namespace DetaCSharp.Drive
                 read = streamData.Read(buffer, 0, buffer.Length);
                 if (read > 0)
                 {
-                    //Need check read < buffer.Lenght?
                     if (read < buffer.Length)
                     {
                         var last = new byte[read];
-                        Array.Copy(buffer, last, last.Length);
+                        Array.Copy(buffer, 0, last, 0, last.Length);
                         buffer = last;
                     }
 
                     requestInit.Payload = buffer;
 
                     response = await requestHelper.Post<UploadResponse>(DriveApi.UPLOAD_FILE_CHUNK.Replace(":uid", uploadId)
-                                                                                                     .Replace(":name", name)
-                                                                                                     .Replace(":part", part.ToString()), requestInit);
+                                                                                                  .Replace(":name", name)
+                                                                                                  .Replace(":part", part.ToString()), requestInit);
                     response.EnsureSuccess();
 
                     part++;
@@ -243,7 +242,7 @@ namespace DetaCSharp.Drive
 
             //COMPLETE_FILE
             var complete = await requestHelper.Patch<UploadResponse>(DriveApi.COMPLETE_FILE_UPLOAD.Replace(":uid", uploadId)
-                                                                                                     .Replace(":name", name));
+                                                                                                  .Replace(":name", name));
 
             complete.EnsureSuccess();
 
