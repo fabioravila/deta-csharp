@@ -8,8 +8,10 @@ using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -23,7 +25,7 @@ namespace DetaCSharp.Base
 
         public BaseClass(DetaOptions options, string baseName, HttpClient httpClient)
         {
-            baseHostUrl = options.DriveHostUrl.Replace(":base_name", baseName);
+            baseHostUrl = options.BaseHostUrl.Replace(":base_name", baseName);
             requestHelper = new RequestsHelper(options.ProjectKey, baseHostUrl, httpClient);
             util = new BaseUtils();
         }
@@ -181,16 +183,37 @@ namespace DetaCSharp.Base
         }
 
 
-        public async IAsyncEnumerable<T> Fetch<T>(object query, int pages = 10, int? buffer = null)
+        public async IAsyncEnumerable<T> Fetch<T>(object query, int pages = 10, int? buffer = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-
-            //TODO
             var lastValue = "";
+            var q = IsArray(query) ? (object[])query : new[] { query };
 
+            for (int i = 0; i < pages; i++)
+            {
+                var response = await requestHelper.Post<QueryResponse<T>>(BaseApi.QUERY_ITEMS, new RequestInit
+                {
+                    Payload = new
+                    {
+                        query = q,
+                        limit = buffer,
+                        last = lastValue
+                    }
+                });
 
-            await Task.CompletedTask;
+                response.EnsureSuccess();
 
-            yield return default;
+                lastValue = response.Body.Paging.Last;
+
+                foreach (var item in response.Body.Items)
+                {
+                    yield return item;
+                }
+
+                if (string.IsNullOrWhiteSpace(lastValue))
+                {
+                    break;
+                }
+            }
         }
 
         public UpdateRawRequest CreateUpdateRequest() => new UpdateRawRequest(requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
@@ -207,6 +230,8 @@ namespace DetaCSharp.Base
                 || type == typeof(decimal)
                 || data is IEnumerable;
         }
+
+        static bool IsArray(object data) => data is IEnumerable;
 
         static IDictionary<string, object> ToDictionary(object data)
         {
