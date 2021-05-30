@@ -8,6 +8,11 @@ namespace DetaCSharp.Base
 {
     public class PutResponse
     {
-        public IEnumerable<ItemKeyResponse> Processed { get; set; }
+        public ItemsResponse Processed { get; set; }
+    }
+
+    public class ItemsResponse
+    {
+        public IEnumerable<ItemKeyResponse> Items { get; set; }
     }
 }

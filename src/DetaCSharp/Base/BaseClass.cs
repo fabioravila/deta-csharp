@@ -30,7 +30,7 @@ namespace DetaCSharp.Base
             util = new BaseUtils();
         }
 
-        public async Task<string> Put(object data, string key = null)
+        public async Task<IEnumerable<ItemKeyResponse>> Put(object data, string key = null)
         {
             var item = CreateItemPayload(data, key);
 
@@ -44,7 +44,7 @@ namespace DetaCSharp.Base
 
 
             //TODO: For now we just return a key as string
-            return response.Body?.Processed?.FirstOrDefault()?.Key ?? null;
+            return response.Body?.Processed?.Items ?? null;
         }
 
         public async Task<T> Get<T>(string key)
@@ -105,7 +105,7 @@ namespace DetaCSharp.Base
 
             if (response.IsError && response.Status == HttpStatusCode.Conflict)
             {
-                throw new DetaException(response.Status, $"Item with key ${key} already exists");
+                throw new DetaException(response.Status, $"Item with key {key} already exists");
             }
 
 
@@ -142,6 +142,8 @@ namespace DetaCSharp.Base
             return response.Body;
         }
 
+
+
         public async Task<ItemKeyResponse> Update(object updates, string key)
         {
             var trimmedKey = key?.Trim();
@@ -151,7 +153,7 @@ namespace DetaCSharp.Base
             }
 
             object payload = null;
-            if (updates is UpdateRawRequest)
+            if (updates is Update)
             {
                 payload = updates;
             }
@@ -159,7 +161,7 @@ namespace DetaCSharp.Base
             {
 
                 //TODO: This is a hacky too, come back here later
-                var updatePayload = CreateUpdateRequest();
+                var updatePayload = CreateUpdate();
 
                 foreach ((var objKey, var value) in ToDictionary(updates))
                 {
@@ -182,11 +184,20 @@ namespace DetaCSharp.Base
             };
         }
 
-
-        public async IAsyncEnumerable<T> Fetch<T>(object query, int pages = 10, int? buffer = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async IAsyncEnumerable<T> Fetch<T>(object query = null, int pages = 10, int? buffer = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var lastValue = "";
-            var q = IsArray(query) ? (object[])query : new[] { query };
+
+            object q = null;
+            if (query is Query)
+            {
+                q = query;
+            }
+            else
+            {
+                q = IsArray(query) ? (object[])query : new[] { query };
+            }
+
 
             for (int i = 0; i < pages; i++)
             {
@@ -216,8 +227,17 @@ namespace DetaCSharp.Base
             }
         }
 
-        public UpdateRawRequest CreateUpdateRequest() => new UpdateRawRequest(requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
+        /// <summary>
+        /// Createa sa Update object sugar to be use in the UpdateMethod
+        /// </summary>
+        /// <returns></returns>
+        public Update CreateUpdate() => new Update(requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
 
+        /// <summary>
+        /// Creates a query object sugar to use i Query methods
+        /// </summary>
+        /// <returns></returns>
+        public Query CreateQuery() => new Query(requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
 
         //Check is a type is consideres simple by deta (array, string, number, boolean)
         static bool IsDetaSimpleType(object data)
@@ -233,9 +253,9 @@ namespace DetaCSharp.Base
 
         static bool IsArray(object data) => data is IEnumerable;
 
-        static IDictionary<string, object> ToDictionary(object data)
+        IDictionary<string, object> ToDictionary(object data)
         {
-            var dictionary = new Dictionary<string, object>();
+            var dictionary = new JsonNamingPolicyDictionary(requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
             foreach (PropertyDescriptor property in TypeDescriptor.GetProperties(data))
             {
                 dictionary.Add(property.Name, property.GetValue(data));
@@ -249,7 +269,7 @@ namespace DetaCSharp.Base
             return JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(data));
         }
 
-        static object CreateItemPayload(object data, string key)
+        object CreateItemPayload(object data, string key)
         {
             //TODO: THis is very hacky as i dont know about performance issue, so back here later to optmize
             if (IsDetaSimpleType(data))
@@ -258,16 +278,16 @@ namespace DetaCSharp.Base
             }
 
 
-            return string.IsNullOrWhiteSpace(key) ? data : (object)new DetaKeyedObject { Key = key, ObjectData = ToDictionary(data) };
-        }
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return data;
+            }
 
+            //preference is for key properties
+            var dict = ToDictionary(data);
+            dict["key"] = key;
 
-        class DetaKeyedObject
-        {
-            public string Key { get; set; }
-
-            [JsonExtensionData]
-            public IDictionary<string, object> ObjectData { get; set; }
+            return dict;
         }
     }
 }
