@@ -21,13 +21,12 @@ namespace DetaCSharp.Base
     {
         private string baseHostUrl;
         private RequestsHelper requestHelper;
-        private BaseUtils util;
+        const string KEY_PROP = "key";
 
         public BaseClass(DetaOptions options, string baseName, HttpClient httpClient)
         {
             baseHostUrl = options.BaseHostUrl.Replace(":base_name", baseName);
             requestHelper = new RequestsHelper(options.ProjectKey, baseHostUrl, httpClient);
-            util = new BaseUtils();
         }
 
         public async Task<IEnumerable<ItemKeyResponse>> Put(object data, string key = null)
@@ -142,8 +141,6 @@ namespace DetaCSharp.Base
             return response.Body;
         }
 
-
-
         public async Task<ItemKeyResponse> Update(object updates, string key)
         {
             var trimmedKey = key?.Trim();
@@ -253,22 +250,6 @@ namespace DetaCSharp.Base
 
         static bool IsArray(object data) => data is IEnumerable;
 
-        IDictionary<string, object> ToDictionary(object data)
-        {
-            var dictionary = new JsonNamingPolicyDictionary(requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
-            foreach (PropertyDescriptor property in TypeDescriptor.GetProperties(data))
-            {
-                dictionary.Add(property.Name, property.GetValue(data));
-            }
-
-            return dictionary;
-        }
-
-        public static IDictionary<string, object> ToDictionaryWithSerialize(object data)
-        {
-            return JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(data));
-        }
-
         object CreateItemPayload(object data, string key)
         {
             //TODO: THis is very hacky as i dont know about performance issue, so back here later to optmize
@@ -285,9 +266,16 @@ namespace DetaCSharp.Base
 
             //preference is for key properties
             var dict = ToDictionary(data);
-            dict["key"] = key;
+            dict[KEY_PROP] = key;
 
             return dict;
         }
+
+        IDictionary<string, object> ToDictionary(object source)
+        {
+            //For now i will use typedescritor to convert object to dictionary
+            return ObjectToDictionaryConverter.ToDictionaryWithTypeDescriptor(source, requestHelper.JsonSerializerOptions.PropertyNamingPolicy);
+        }
+
     }
 }
