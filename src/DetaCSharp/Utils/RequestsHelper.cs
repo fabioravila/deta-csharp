@@ -16,8 +16,7 @@ namespace DetaCSharp.Utils
         readonly HttpClient http;
         const string JsonContentType = "application/json";
 
-
-        static JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions
+        public JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
@@ -32,12 +31,14 @@ namespace DetaCSharp.Utils
 
 
         public Task<Response<Unit>> Put(string uri, object payload) => SendAsync(HttpMethod.Put, uri, payload);
+        public Task<Response<T>> Put<T>(string uri, object payload) => SendAsync<T>(HttpMethod.Put, uri, payload);
         public Task<Response<T>> Delete<T>(string uri, object payload = null) => SendAsync<T>(HttpMethod.Delete, uri, payload);
+
+        public Task<Response<Unit>> Delete(string uri, object payload = null) => SendAsync(HttpMethod.Delete, uri, payload);
         public Task<Response<T>> Get<T>(string uri) => SendAsync<T>(HttpMethod.Get, uri, null);
         public Task<Response<Unit>> Post(string uri, object payload) => SendAsync(HttpMethod.Post, uri, payload);
         public Task<Response<T>> Post<T>(string uri, RequestInit init) => SendAsync<T>(HttpMethod.Post, uri, init.Payload, init.Headers);
         public Task<Response<Unit>> Patch(string uri, object payload = null) => SendAsync(HttpMethod.Patch, uri, payload);
-
         public Task<Response<T>> Patch<T>(string uri, object payload = null) => SendAsync<T>(HttpMethod.Patch, uri, payload);
 
 
@@ -58,7 +59,6 @@ namespace DetaCSharp.Utils
             }
 
 
-
             var content = GenerateContent(payload);
             if (content != null)
             {
@@ -66,15 +66,17 @@ namespace DetaCSharp.Utils
             }
 
 
-            var response = await http.SendAsync(request);
+            var response = await http.SendAsync(request)
+                                     .ConfigureAwait(false);
 
 
             //For now, to determine is content is JSON i will use header content
-            var streamResponse = await response.Content.ReadAsStreamAsync();
+            var streamResponse = await response.Content.ReadAsStreamAsync()
+                                                       .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
-                var error = await DeserializeJsonFromStream<ErrorResponse>(streamResponse);
+                var error = await DeserializeJsonFromStream<ErrorResponse>(streamResponse).ConfigureAwait(false);
 
                 var message = error?.Errors?.Length > 0 ? error.Errors[0] : "Something went wrong";
 
@@ -86,12 +88,11 @@ namespace DetaCSharp.Utils
             }
 
 
-            if (response.Content.Headers.ContentType != null && response.Content.Headers.ContentType.MediaType != null &&
-                response.Content.Headers.ContentType.MediaType.StartsWith(JsonContentType))
+            if (IsJsonContentType(response))
             {
                 return new Response<T>
                 {
-                    Body = await DeserializeJsonFromStream<T>(streamResponse),
+                    Body = await DeserializeJsonFromStream<T>(streamResponse).ConfigureAwait(false),
                     Status = response.StatusCode
                 };
             }
@@ -105,6 +106,20 @@ namespace DetaCSharp.Utils
                 };
             }
         }
+
+
+        async Task<T> DeserializeJsonFromStream<T>(Stream stream)
+        {
+            if (stream is null || stream.CanRead is false)
+            {
+                return default;
+            }
+
+            return await JsonSerializer.DeserializeAsync<T>(stream, JsonSerializerOptions)
+                                       .ConfigureAwait(false);
+        }
+
+        static bool IsJsonContentType(HttpResponseMessage response) => response.Content.Headers?.ContentType?.MediaType?.StartsWith(JsonContentType) == true;
 
         HttpContent GenerateContent(object payload)
         {
@@ -124,25 +139,16 @@ namespace DetaCSharp.Utils
             }
             else if (payload is string)
             {
-                return new StringContent(payload as string);
+                return new StringContent(payload as string, Encoding.UTF8);
             }
             else
             {
-                return new StringContent(JsonSerializer.Serialize(payload, JsonSerializerOptions), Encoding.UTF8, JsonContentType);
+                var json = JsonSerializer.Serialize(payload, JsonSerializerOptions);
+
+                return new StringContent(json, Encoding.UTF8, JsonContentType);
             }
 
         }
-
-        protected async Task<T> DeserializeJsonFromStream<T>(Stream stream)
-        {
-            if (stream is null || stream.CanRead is false)
-            {
-                return default;
-            }
-
-            return await JsonSerializer.DeserializeAsync<T>(stream, JsonSerializerOptions);
-        }
-
 
         class ErrorResponse
         {

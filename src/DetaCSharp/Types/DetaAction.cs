@@ -14,4 +14,3 @@ namespace DetaCSharp.Types
         public object Value { get; }
     }
 }
- 
